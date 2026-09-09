@@ -540,7 +540,7 @@ export default function Podcast({
             {duration
               ? `${Math.floor(duration / 60)}:${String(Math.round(duration % 60)).padStart(2, '0')} · `
               : ''}
-            Two preset voices · Chatterbox Turbo
+            Sophie & Joe · Chatterbox Original
           </p>
           <audio
             controls

@@ -334,7 +334,7 @@ def podcast_pause(text):
     return 0.20 if text.rstrip().endswith("?") else 0.30
 
 
-def record_podcast(discussion, on_turn=None, cancelled=None, *, model_name="turbo"):
+def record_podcast(discussion, on_turn=None, cancelled=None, *, model_name="standard"):
     import numpy as np
     import soundfile as sf
     import torch
