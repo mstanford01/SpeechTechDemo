@@ -31,7 +31,7 @@ Import a written document up to 10 MB. Review the text before generating. Speech
 5. Review the facts and edit the speaker turns if needed.
 6. Record the podcast, then play and download the MP3 and transcript.
 
-Podcasts feature Sophie and Joe, a fixed American English voice pair. Scripts include a brief greeting, connected discussion and a friendly close. Both hosts use natural speaking pace without audio time stretching. Normal turns stay together to preserve sentence context, and questions have quicker handoffs than explanations. The server balances volume and retains the fixed American voice pair. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
+Podcasts feature Sophie (California) and Joe (Iowa), a fixed American English voice pair. Scripts include a brief greeting, connected discussion and a friendly close. Both hosts use natural speaking pace without audio time stretching. Normal turns stay together to preserve sentence context, and questions have quicker handoffs than explanations. The server balances volume and retains the fixed American voice pair. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
 
 ## Preset voices only
 
@@ -85,7 +85,7 @@ This is a loopback-only demonstration, not a publicly hosted service. Public dep
 
 - Resemble AI Chatterbox, MIT: https://github.com/resemble-ai/chatterbox
 - Qwen3-4B-Instruct-2507, Apache 2.0, converted by mlx-community.
-- VCTK p329/p311 recordings, CC BY 4.0, used as fixed presets.
+- VCTK p299/p311 recordings, CC BY 4.0, used as fixed presets.
 - Experis branding: https://www.experis.com/en
 
 Full attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and available from the app's credits link.

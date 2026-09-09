@@ -34,7 +34,7 @@ Other bundled dependencies retain their own licenses.
 
 ## Fixed voice presets (VCTK)
 
-`server/presets/female.wav` and `server/presets/male.wav` are the p329_023 and p311_023 mic1 recordings, respectively, from the CSTR VCTK Corpus, mirrored by Kyutai. Both speakers are listed as American in the corpus speaker metadata (p329 female, p311 male from Iowa). They are included unchanged and used as fixed conditioning presets; users cannot upload voices.
+`server/presets/female.wav` and `server/presets/male.wav` are the p299_023 and p311_023 mic1 recordings, respectively, from the CSTR VCTK Corpus, mirrored by Kyutai. Both speakers are listed as American in the corpus speaker metadata (p299 female from California, p311 male from Iowa). They are included unchanged and used as fixed conditioning presets; users cannot upload voices.
 
 Attribution: Yamagishi, Junichi; Veaux, Christophe; MacDonald, Kirsten. (2019). CSTR VCTK Corpus: English Multi-speaker Corpus for CSTR Voice Cloning Toolkit (version 0.92), [sound]. University of Edinburgh, Centre for Speech Technology Research (CSTR). https://doi.org/10.7488/ds/2645.
 
