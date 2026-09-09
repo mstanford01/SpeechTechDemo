@@ -1816,4 +1816,5 @@ footer {
 .transcription-summary-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .transcription-summary-output { border-top: 1px solid #dde3ed; margin-top: 26px; padding-top: 16px; }
 .transcription-summary-output > p { line-height: 1.75; }
+.transcription-summary-output > p + p { margin-top: 1.25rem; }
 @media (max-width: 650px) { .transcription-summary-controls { grid-template-columns: 1fr; } }
