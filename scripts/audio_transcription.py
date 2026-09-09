@@ -1,6 +1,7 @@
 """Shared local Whisper transcription for uploaded and downloaded audio."""
 import os
 from pathlib import Path
+import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,6 +10,11 @@ os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 MODEL = "mlx-community/whisper-large-v3-turbo"
 MAX_SECONDS = 7200
 MAX_BYTES = 250 * 1024 * 1024
+
+
+def normalize_company_names(text):
+    """Apply the studio's approved spelling without changing unrelated words."""
+    return re.sub(r"\b(?:xperis|experis)\b", "Experis", text, flags=re.IGNORECASE)
 
 
 def transcribe_audio(source):
@@ -26,7 +32,7 @@ def transcribe_audio(source):
     result = mlx_whisper.transcribe(audio, path_or_hf_repo=MODEL, verbose=None,
                                     condition_on_previous_text=False)
     segments = [{"start": round(float(s["start"]), 2), "end": round(float(s["end"]), 2),
-                 "text": s["text"].strip()} for s in result["segments"] if s["text"].strip()]
+                 "text": normalize_company_names(s["text"].strip())} for s in result["segments"] if s["text"].strip()]
     text = "\n\n".join(s["text"] for s in segments)
     if not text:
         raise ValueError("No speech was detected in this recording.")

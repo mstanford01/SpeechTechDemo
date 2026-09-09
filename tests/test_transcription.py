@@ -1,12 +1,35 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from server.app import app, lock
 from server.youtube import video_id, summarize_transcript
 from scripts.summarize_transcript import chunks
+from scripts.audio_transcription import normalize_company_names, transcribe_audio
 
 
 class TranscriptionTests(unittest.TestCase):
+    def test_company_spelling_preserves_other_words_and_punctuation(self):
+        self.assertEqual(
+            normalize_company_names("Xperis, experis and EXPERIS. Xperis's expertise; experience and XperisLabs."),
+            "Experis, Experis and Experis. Experis's expertise; experience and XperisLabs.",
+        )
+
+    def test_company_spelling_reaches_segments_and_full_transcript(self):
+        recognized = {'language': 'en', 'segments': [
+            {'start': 0, 'end': 1.5, 'text': ' At Xperis, we help. '},
+            {'start': 1.5, 'end': 3, 'text': ' Experience matters. '},
+        ]}
+        decoder = SimpleNamespace(get_ffmpeg_exe=lambda: 'ffmpeg')
+        whisper = SimpleNamespace(transcribe=lambda *args, **kwargs: recognized)
+        with patch.dict('sys.modules', {'imageio_ffmpeg': decoder, 'mlx_whisper': whisper}), patch(
+            'scripts.audio_transcription.subprocess.run', return_value=SimpleNamespace(stdout=b'\x00\x00' * 48000)
+        ):
+            result = transcribe_audio('sample.wav')
+        self.assertEqual(result['text'], 'At Experis, we help.\n\nExperience matters.')
+        self.assertEqual(result['segments'][0], {'start': 0.0, 'end': 1.5, 'text': 'At Experis, we help.'})
+        self.assertFalse(result['captions_used'])
+
     def test_video_links_are_normalized_without_arbitrary_hosts(self):
         for url in ['https://youtu.be/mdX3vls-ltg', 'https://www.youtube.com/watch?v=mdX3vls-ltg&list=ignored', 'https://youtube.com/shorts/mdX3vls-ltg']:
             self.assertEqual(video_id(url), 'mdX3vls-ltg')
