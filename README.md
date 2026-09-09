@@ -89,3 +89,9 @@ This is a loopback-only demonstration, not a publicly hosted service. Public dep
 - Experis branding: https://www.experis.com/en
 
 Full attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and available from the app's credits link.
+
+### Faster repeat recordings
+
+The server keeps preset voice conditioning in memory alongside the active speech model. Repeated speech requests and podcasts reuse it; switching models or restarting clears it. A local M1 Max measurement took 13.0 seconds to prepare both podcast presets initially and under 1 ms to retrieve them again. This removes preparation overhead, not the time spent synthesizing speech.
+
+Podcast recording streams completed turns to a **First listen** panel. You can play each turn before the entire episode is ready. The finished WAV and transcript remain available after recording. Audio is held in memory only. Disconnecting stops generation between passages.

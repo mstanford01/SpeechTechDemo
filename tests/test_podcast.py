@@ -6,6 +6,49 @@ from server.podcast import validate_discussion, validate_url
 
 
 class PodcastTests(unittest.TestCase):
+    def test_preset_cache_is_per_model_and_restores_default(self):
+        from server.app import preset_conditions
+        class Model:
+            def __init__(self):
+                self.conds = "default"
+                self.calls = 0
+            def prepare_conditionals(self, path):
+                self.calls += 1
+                self.conds = object()
+        first, second = Model(), Model()
+        female = preset_conditions(first, "female")
+        self.assertIs(preset_conditions(first, "female"), female)
+        self.assertIsNot(preset_conditions(first, "male"), female)
+        self.assertIsNot(preset_conditions(second, "female"), female)
+        self.assertEqual(first.calls, 2)
+        self.assertEqual(first.conds, "default")
+
+    def test_stream_emits_preview_then_completed_audio(self):
+        import json
+        def record(discussion, on_turn, cancelled):
+            on_turn(0, b"preview")
+            return b"episode"
+        discussion = {"title": "Topic", "turns": [
+            {"speaker": "A", "text": "Question."},
+            {"speaker": "B", "text": "Answer."},
+        ]}
+        with patch("server.app.record_podcast", side_effect=record):
+            response = TestClient(app).post("/api/podcast/stream", json=discussion)
+        events = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual([event["type"] for event in events], ["turn", "complete"])
+        self.assertEqual(events[0]["audio"], "cHJldmlldw==")
+
+    def test_stream_reports_failure_without_fake_completion(self):
+        import json
+        from fastapi import HTTPException
+        discussion = {"title": "Topic", "turns": [
+            {"speaker": "A", "text": "Question."},
+            {"speaker": "B", "text": "Answer."},
+        ]}
+        with patch("server.app.record_podcast", side_effect=HTTPException(409, "Busy")):
+            response = TestClient(app).post("/api/podcast/stream", json=discussion)
+        self.assertEqual(json.loads(response.text), {"type": "error", "detail": "Busy"})
+
     def test_private_url_rejected(self):
         for url in [
             "file:///etc/passwd",

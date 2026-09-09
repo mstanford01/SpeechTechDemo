@@ -37,6 +37,8 @@ export default function Podcast({
   const [level, setLevel] = useState('everyday');
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [audio, setAudio] = useState('');
+  const [previews, setPreviews] = useState<string[]>([]);
+  const previewUrls = useRef<string[]>([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -68,6 +70,7 @@ export default function Podcast({
   useEffect(
     () => () => {
       if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+      previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
     },
     [],
   );
@@ -151,8 +154,11 @@ export default function Podcast({
     setBusy('record');
     setError('');
     setStatus('Preparing the two preset voices');
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.current = [];
+    setPreviews([]);
     try {
-      const r = await fetch('/api/podcast/audio', {
+      const r = await fetch('/api/podcast/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(discussion),
@@ -161,10 +167,44 @@ export default function Podcast({
         const d = (await r.json()) as { detail?: string };
         throw Error(d.detail || 'Could not record the discussion.');
       }
-      const blob = await r.blob();
-      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-      audioUrl.current = URL.createObjectURL(blob);
-      setAudio(audioUrl.current);
+      if (!r.body) throw Error('The recording stream is unavailable.');
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      let complete = false;
+      const audioBlob = (encoded: string) => new Blob(
+        [Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0))],
+        { type: 'audio/wav' },
+      );
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          pending += decoder.decode(value, { stream: true });
+          let newline;
+          while ((newline = pending.indexOf('\n')) !== -1) {
+            const event = JSON.parse(pending.slice(0, newline)) as {
+              type: string; audio: string; detail?: string;
+            };
+            pending = pending.slice(newline + 1);
+            if (event.type === 'error') throw Error(event.detail || 'Recording failed.');
+            if (event.type === 'turn') {
+              const url = URL.createObjectURL(audioBlob(event.audio));
+              previewUrls.current.push(url);
+              setPreviews([...previewUrls.current]);
+            }
+            if (event.type === 'complete') {
+              if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+              audioUrl.current = URL.createObjectURL(audioBlob(event.audio));
+              setAudio(audioUrl.current);
+              complete = true;
+            }
+          }
+        }
+        if (!complete) throw Error('Recording was interrupted. Please try again.');
+      } finally {
+        await reader.cancel();
+      }
       setRecordedTitle(discussion.title);
       setRecordedScript(
         discussion.title +
@@ -376,7 +416,7 @@ export default function Podcast({
               : 'Your article stays on this Mac'}
             <small>
               {busy === 'record'
-                ? 'Recording a podcast can take several minutes.'
+                ? 'Listen to completed turns below while the rest records.'
                 : 'URL import contacts the source website; AI processing is local.'}
             </small>
           </div>
@@ -399,6 +439,22 @@ export default function Podcast({
         <div className="error" role="alert">
           {error}
         </div>
+      )}
+      {previews.length > 0 && (
+        <section className="panel podcast-result">
+          <div className="result-label"><Headphones size={17} /> FIRST LISTEN</div>
+          <h2>{busy === 'record' ? 'Your conversation is taking shape' : 'Listen by turn'}</h2>
+          <p>{previews.length} turns ready. Play any completed turn.</p>
+          {previews.map((url, index) => (
+            <div key={url}>
+              <p>Turn {index + 1}</p>
+              <audio controls src={url} aria-label={`Preview turn ${index + 1}`}
+                onPlay={(e) => document.querySelectorAll('audio').forEach((a) => {
+                  if (a !== e.currentTarget) a.pause();
+                })} />
+            </div>
+          ))}
+        </section>
       )}
       {discussion && (
         <section className="panel discussion-panel">

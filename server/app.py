@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 import asyncio
+import base64
+import json
 import gc
 import io
 import logging
@@ -19,7 +21,7 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("DO_NOT_TRACK", "1")
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
-from fastapi.responses import Response, FileResponse
+from fastapi.responses import Response, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Experis Speech Studio", docs_url=None, redoc_url=None)
@@ -167,6 +169,21 @@ def load_model(name):
     return model
 
 
+def preset_conditions(model, voice):
+    """Cache only fixed preset conditioning on its owning model, under the engine lock."""
+    cache = getattr(model, "_studio_presets", None)
+    if cache is None:
+        cache = model._studio_presets = {}
+    if voice not in cache:
+        original = model.conds
+        try:
+            model.prepare_conditionals(str(ROOT / "server/presets" / f"{voice}.wav"))
+            cache[voice] = model.conds
+        finally:
+            model.conds = original
+    return cache[voice]
+
+
 def synthesize(text, name, exaggeration, cfg_weight, voice="default"):
     import numpy as np
     import soundfile as sf
@@ -186,9 +203,7 @@ def synthesize(text, name, exaggeration, cfg_weight, voice="default"):
             clips = []
             try:
                 if voice != "default":
-                    model.prepare_conditionals(
-                        str(ROOT / "server/presets" / f"{voice}.wav")
-                    )
+                    model.conds = preset_conditions(model, voice)
                 with torch.inference_mode():
                     for index, chunk in enumerate(chunks):
                         state["phase"] = (
@@ -309,7 +324,7 @@ async def podcast_script(request: Request):
         lock.release()
 
 
-def record_podcast(discussion):
+def record_podcast(discussion, on_turn=None, cancelled=None):
     import numpy as np
     import soundfile as sf
     import torch
@@ -325,10 +340,7 @@ def record_podcast(discussion):
         clips = []
         try:
             for speaker, voice in [("A", "female"), ("B", "male")]:
-                model.prepare_conditionals(
-                    str(ROOT / "server/presets" / f"{voice}.wav")
-                )
-                conditions[speaker] = model.conds
+                conditions[speaker] = preset_conditions(model, voice)
             with torch.inference_mode():
                 for index, turn in enumerate(discussion["turns"]):
                     state["phase"] = (
@@ -337,6 +349,8 @@ def record_podcast(discussion):
                     model.conds = conditions[turn["speaker"]]
                     pieces = []
                     for chunk in split_text(turn["text"]):
+                        if cancelled is not None and cancelled.is_set():
+                            return b""
                         wav = model.generate(chunk, temperature=0.65)
                         pieces.append(wav.detach().cpu().numpy().reshape(-1))
                     samples = np.concatenate(pieces)
@@ -353,6 +367,10 @@ def record_podcast(discussion):
                     samples[-fade:] *= np.linspace(1, 0, fade)
                     clips.append(samples)
                     clips.append(np.zeros(int(model.sr * 0.42), dtype="float32"))
+                    if on_turn is not None:
+                        preview = io.BytesIO()
+                        sf.write(preview, np.concatenate(clips[-2:]), model.sr, format="WAV", subtype="PCM_16")
+                        on_turn(index, preview.getvalue())
             stream = io.BytesIO()
             sf.write(
                 stream, np.concatenate(clips), model.sr, format="WAV", subtype="PCM_16"
@@ -388,6 +406,50 @@ async def podcast_audio(request: Request):
         media_type="audio/wav",
         headers={"Content-Disposition": 'attachment; filename="experis-podcast.wav"'},
     )
+
+
+@app.post("/api/podcast/stream")
+async def podcast_stream(request: Request):
+    from .podcast import validate_discussion
+
+    try:
+        discussion = validate_discussion(await request.json())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    cancelled = threading.Event()
+
+    def publish(event):
+        if not cancelled.is_set():
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    def worker():
+        try:
+            wav = record_podcast(
+                discussion,
+                lambda index, clip: publish({"type": "turn", "index": index, "audio": base64.b64encode(clip).decode()}),
+                cancelled,
+            )
+            publish({"type": "complete", "audio": base64.b64encode(wav).decode()})
+        except Exception as exc:
+            logger.exception("Podcast stream failed")
+            publish({"type": "error", "detail": exc.detail if isinstance(exc, HTTPException) else "Could not finish recording. Your script is still available."})
+
+    async def events():
+        task = asyncio.create_task(asyncio.to_thread(worker))
+        try:
+            while True:
+                event = await queue.get()
+                yield json.dumps(event) + "\n"
+                if event["type"] in {"complete", "error"}:
+                    break
+        finally:
+            cancelled.set()
+            # The worker checks cancellation between passages and releases the engine lock.
+            await asyncio.shield(task)
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
 static_dir = ROOT / "dist" / "client"
