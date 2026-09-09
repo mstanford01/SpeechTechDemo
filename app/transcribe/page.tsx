@@ -18,12 +18,12 @@ export default function Transcribe() {
   const [level, setLevel] = useState('everyday');
   const [paragraphs, setParagraphs] = useState('5');
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [summaryInput, setSummaryInput] = useState('url');
+  const [resultSource, setResultSource] = useState('');
   const [articleUrl, setArticleUrl] = useState('');
   const [summaryArticle, setSummaryArticle] = useState<{ text: string; title: string; url: string } | null>(null);
-  const summaryText = summaryInput === 'url' ? summaryArticle?.text || '' : text;
-  const summaryTitle = summaryInput === 'url' ? summaryArticle?.title || 'Article summary' : result?.title || 'Recording summary';
-  const summaryUrl = summaryInput === 'url' ? summaryArticle?.url || '' : result?.url || '';
+  const summaryText = source === 'url' ? summaryArticle?.text || '' : text;
+  const summaryTitle = source === 'url' ? summaryArticle?.title || 'Article summary' : result?.title || 'Recording summary';
+  const summaryUrl = source === 'url' ? summaryArticle?.url || '' : result?.url || '';
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!busy) return;
@@ -40,27 +40,26 @@ export default function Transcribe() {
       const response = await fetch(source === 'youtube' ? '/api/youtube' : '/api/transcribe/upload', { method: 'POST', headers, body });
       const data = await response.json() as Transcript & { detail?: string };
       if (!response.ok) throw Error(data.detail || 'Could not transcribe this recording.');
-      setResult(data); setText(data.text); setSummary(null); setSummaryInput('transcript');
+      setResult(data); setText(data.text); setSummary(null); setResultSource(source);
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(''); }
   }
   async function summarize() {
-    setBusy('summary'); setError('');
+    setBusy(source === 'url' && !summaryArticle ? 'article' : 'summary'); setError('');
     try {
-      const response = await fetch('/api/transcribe/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: summaryText, level, paragraphs: Number(paragraphs) }) });
+      let sourceText = summaryText;
+      if (source === 'url' && !summaryArticle) {
+        const articleResponse = await fetch('/api/article', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: articleUrl }) });
+        const article = await articleResponse.json() as { text: string; title: string; detail?: string };
+        if (!articleResponse.ok) throw Error(article.detail || 'Could not read this article.');
+        setSummaryArticle({ ...article, url: articleUrl });
+        sourceText = article.text;
+      }
+      setBusy('summary');
+      const response = await fetch('/api/transcribe/summary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: sourceText, level, paragraphs: Number(paragraphs) }) });
       const data = await response.json() as Summary & { detail?: string };
       if (!response.ok) throw Error(data.detail || 'Could not create the summary.');
       setSummary(data);
-    } catch (e) { setError((e as Error).message); }
-    finally { setBusy(''); }
-  }
-  async function importSummaryArticle() {
-    setBusy('article'); setError('');
-    try {
-      const response = await fetch('/api/article', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: articleUrl }) });
-      const data = await response.json() as { text: string; title: string; detail?: string };
-      if (!response.ok) throw Error(data.detail || 'Could not read this article.');
-      setSummaryArticle({ ...data, url: articleUrl }); setSummary(null);
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(''); }
   }
@@ -86,11 +85,17 @@ export default function Transcribe() {
       <div className="transcription-intro"><span className="transcription-icon"><Headphones size={30} /></span><div><h1>Transcribe & summarize</h1><p>Get the words from a recording. Get the key ideas from a recording or article.</p></div></div>
       <section className="panel"><div className="article-body">
         <label id="transcription-source">Start with</label>
-        <Select value={source} onValueChange={(v) => v && setSource(v)} disabled={!!busy}>
+        <Select value={source} onValueChange={(v) => { if (v) { setSource(v); setSummary(null); setError(''); } }} disabled={!!busy}>
           <SelectTrigger aria-labelledby="transcription-source" className="model-select"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="youtube">YouTube video</SelectItem><SelectItem value="file">Audio file</SelectItem></SelectContent>
+          <SelectContent><SelectItem value="youtube">YouTube video</SelectItem><SelectItem value="file">Audio file</SelectItem><SelectItem value="url">Article URL</SelectItem></SelectContent>
         </Select>
-        {source === 'youtube' ? <div className="transcription-source-body">
+        {source === 'url' ? <div className="transcription-source-body">
+          <label htmlFor="summary-article-url">Article URL</label>
+          <form id="article-summary-form" className="url-input" onSubmit={(e) => { e.preventDefault(); void summarize(); }}>
+            <input id="summary-article-url" type="url" required disabled={!!busy} value={articleUrl} onChange={(e) => { setArticleUrl(e.target.value); setSummaryArticle(null); setSummary(null); }} placeholder="https://example.com/article" />
+          </form>
+          <p className="helper">Paste an article link, choose your summary options below, and select Create summary.</p>
+        </div> : source === 'youtube' ? <div className="transcription-source-body">
           <label htmlFor="youtube-url">YouTube video URL</label>
           <form className="url-input" onSubmit={(e) => { e.preventDefault(); void transcribe(); }}>
             <Video size={20} /><input id="youtube-url" type="url" required value={url} disabled={!!busy} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" />
@@ -111,7 +116,7 @@ export default function Transcribe() {
       </div></section>
       {busy && <div className="transcription-progress" role="status"><LoaderCircle className="spin" size={20} /><div>{busy === 'summary' ? 'Writing your summary' : busy === 'article' ? 'Reading the article' : 'Preparing audio and transcribing'} · {elapsed}s<small>Processing locally. Longer recordings take more time. Keep this page open.</small></div></div>}
       {error && <div className="error" role="alert">{error}</div>}
-      {result && <section className="panel transcription-result">
+      {result && resultSource === source && <section className="panel transcription-result">
           <div className="panel-heading"><div><span className="step">FULL TRANSCRIPT</span><h2>{result.title}</h2></div></div>
           <div className="article-body">
             <p className="helper">{Math.floor(result.duration / 60)}:{String(Math.floor(result.duration % 60)).padStart(2, '0')} recording · {result.language.toUpperCase()} · Transcribed from audio</p>
@@ -125,31 +130,19 @@ export default function Transcribe() {
             {text.length > 24000 && <p className="helper">This transcript is long. Create a summary below to use in a podcast, or select an excerpt of up to 24,000 characters.</p>}
           </div>
         </section>}
-        <section className="panel transcription-result">
+        {(source === 'url' || (result && resultSource === source)) && <section className="panel transcription-result">
           <div className="panel-heading"><div><span className="step">SUMMARY</span><h2>The detail you need</h2></div></div>
           <div className="article-body">
-            <label id="summary-input">Summarize</label>
-            <Select value={summaryInput} onValueChange={(v) => { if (v) { setSummaryInput(v); setSummary(null); } }} disabled={!!busy}>
-              <SelectTrigger aria-labelledby="summary-input" className="model-select"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="url">Article URL</SelectItem><SelectItem value="transcript" disabled={!result}>The transcript above</SelectItem></SelectContent>
-            </Select>
-            {summaryInput === 'url' && <div className="transcription-source-body">
-              <label htmlFor="summary-article-url">Article URL</label>
-              <form className="url-input" onSubmit={(e) => { e.preventDefault(); void importSummaryArticle(); }}>
-                <input id="summary-article-url" type="url" required disabled={!!busy} value={articleUrl} onChange={(e) => { setArticleUrl(e.target.value); setSummaryArticle(null); setSummary(null); }} placeholder="https://example.com/article" />
-                <button type="submit" disabled={!!busy || !articleUrl.trim()}>Read article <ArrowRight size={15} /></button>
-              </form>
-              {summaryArticle && <><p className="helper">{summaryArticle.title}</p><label htmlFor="summary-article-text">Review the source text</label><textarea id="summary-article-text" disabled={!!busy} value={summaryArticle.text} onChange={(e) => { setSummaryArticle({ ...summaryArticle, text: e.target.value }); setSummary(null); }} /></>}
-            </div>}
+            {source === 'url' && summaryArticle && <><p className="helper">{summaryArticle.title}</p><label htmlFor="summary-article-text">Review the source text</label><textarea id="summary-article-text" disabled={!!busy} value={summaryArticle.text} onChange={(e) => { setSummaryArticle({ ...summaryArticle, text: e.target.value }); setSummary(null); }} /></>}
             <div className="transcription-summary-controls">
               <div><label id="summary-level">Explanation level</label><Select value={level} onValueChange={(v) => v && setLevel(v)} disabled={!!busy}><SelectTrigger aria-labelledby="summary-level" className="model-select"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="plain">Plain language</SelectItem><SelectItem value="everyday">Standard</SelectItem><SelectItem value="technical">Technical depth</SelectItem></SelectContent></Select></div>
               <div><label id="summary-length">Summary length</label><Select value={paragraphs} onValueChange={(v) => v && setParagraphs(v)} disabled={!!busy}><SelectTrigger aria-labelledby="summary-length" className="model-select"><SelectValue /></SelectTrigger><SelectContent>{['1','3','5','8'].map((n) => <SelectItem key={n} value={n}>{n} {n === '1' ? 'paragraph' : 'paragraphs'}</SelectItem>)}</SelectContent></Select></div>
             </div>
-            <p className="helper">{level === 'plain' ? 'Simple language, unfamiliar terms explained.' : level === 'technical' ? 'Keep the terminology and technical detail present in the source.' : 'Clear explanations with useful context.'} {summaryInput === 'url' ? 'Summarize the article without recording audio.' : 'Your full transcript stays above.'}</p>
-            <button className="generate-button" disabled={!!busy || summaryText.trim().length < 80 || summaryText.length > 200000} onClick={summarize}>{busy === 'summary' ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}{summary ? 'Rewrite summary' : 'Create summary'}</button>
+            <p className="helper">{level === 'plain' ? 'Simple language, unfamiliar terms explained.' : level === 'technical' ? 'Keep the terminology and technical detail present in the source.' : 'Clear explanations with useful context.'} {source === 'url' ? 'Summarize the article without recording audio.' : 'Your full transcript stays above.'}</p>
+            <button className="generate-button" type={source === 'url' ? 'submit' : 'button'} form={source === 'url' ? 'article-summary-form' : undefined} disabled={!!busy || (source === 'url' && !summaryArticle ? !articleUrl.trim() : summaryText.trim().length < 80 || summaryText.length > 200000)} onClick={source === 'url' ? undefined : summarize}>{busy === 'summary' ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}{summary ? 'Rewrite summary' : 'Create summary'}</button>
             {summary && <div className="transcription-summary-output"><p className="helper">{levelNames[summary.level]} · {summary.paragraphs} {summary.paragraphs === 1 ? 'paragraph' : 'paragraphs'}</p>{summary.text.split(/\n\n+/).map((p,i) => <p key={i}>{p}</p>)}<div className="transcription-actions"><button className="download" disabled={!!busy} onClick={() => download(summary.text, 'summary', summaryTitle, summaryUrl)}><Download size={16} /> Download summary</button><button className="text-button" disabled={!!busy || summary.text.length < 150 || summary.text.length > 24000} onClick={() => podcast(summary.text, summaryTitle)}><Headphones size={16} /> Make this a podcast</button></div></div>}
           </div>
-        </section>
+        </section>}
     </main>
   </div>;
 }
