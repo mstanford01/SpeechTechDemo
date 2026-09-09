@@ -45,7 +45,7 @@ Sources:
 - https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p226_023.wav
 - https://huggingface.co/kyutai/tts-voices/blob/main/README.md
 
-Podcast audio is newly generated speech conditioned on these presets, with volume normalization, slight tempo adjustment and pauses. The recordings do not imply endorsement by the corpus creators or speakers.
+Podcast audio is newly generated speech conditioned on these presets, with volume normalization and conversational pauses, without tempo adjustment. The recordings do not imply endorsement by the corpus creators or speakers.
 
 ## Local discussion model
 

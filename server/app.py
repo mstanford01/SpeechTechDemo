@@ -324,17 +324,26 @@ async def podcast_script(request: Request):
         lock.release()
 
 
-def record_podcast(discussion, on_turn=None, cancelled=None):
+def podcast_passages(text):
+    """Keep normal host turns intact so intonation has sentence context."""
+    return split_text(text, limit=350)
+
+
+def podcast_pause(text):
+    # Questions hand over quickly; longer explanations get a little breathing room.
+    return 0.20 if text.rstrip().endswith("?") else 0.30
+
+
+def record_podcast(discussion, on_turn=None, cancelled=None, *, model_name="turbo"):
     import numpy as np
     import soundfile as sf
     import torch
-    import librosa
     import pyloudnorm as pyln
 
     if not lock.acquire(blocking=False):
         raise HTTPException(409, "The studio is busy. Try again shortly.")
     try:
-        model = load_model("turbo")
+        model = load_model(model_name)
         original = model.conds
         conditions = {}
         clips = []
@@ -348,17 +357,19 @@ def record_podcast(discussion, on_turn=None, cancelled=None):
                     )
                     model.conds = conditions[turn["speaker"]]
                     pieces = []
-                    for chunk in split_text(turn["text"]):
+                    for chunk in podcast_passages(turn["text"]):
                         if cancelled is not None and cancelled.is_set():
                             return b""
-                        wav = model.generate(
-                            chunk, temperature=0.8 if turn["speaker"] == "A" else 0.65
-                        )
+                        kwargs = {"temperature": 0.8}
+                        if model_name == "standard":
+                            kwargs.update(
+                                exaggeration=0.65 if turn["speaker"] == "A" else 0.55,
+                                cfg_weight=0.3,
+                            )
+                        wav = model.generate(chunk, **kwargs)
                         pieces.append(wav.detach().cpu().numpy().reshape(-1))
                     samples = np.concatenate(pieces)
-                    # Keep Sophie's natural pace; Joe retains his relaxed delivery.
-                    if turn["speaker"] == "B":
-                        samples = librosa.effects.time_stretch(samples, rate=0.96)
+                    # Preserve the model's natural timing and timbre. No time stretching.
                     loudness = pyln.Meter(model.sr).integrated_loudness(samples)
                     if np.isfinite(loudness):
                         samples = pyln.normalize.loudness(samples, loudness, -20)
@@ -370,7 +381,7 @@ def record_podcast(discussion, on_turn=None, cancelled=None):
                     samples[:fade] *= np.linspace(0, 1, fade)
                     samples[-fade:] *= np.linspace(1, 0, fade)
                     clips.append(samples)
-                    clips.append(np.zeros(int(model.sr * 0.42), dtype="float32"))
+                    clips.append(np.zeros(int(model.sr * podcast_pause(turn["text"])), dtype="float32"))
                     if on_turn is not None:
                         preview = io.BytesIO()
                         sf.write(preview, np.concatenate(clips[-2:]), model.sr, format="WAV", subtype="PCM_16")
