@@ -105,6 +105,8 @@ def validate_discussion(d):
         raise ValueError("The discussion format was not valid. Try creating it again.")
     if not 2 <= len(d["turns"]) <= 20 or len(d["title"]) > 200:
         raise ValueError("Use 2–20 speaker turns and a short title.")
+    if "reuse_audio" in d and type(d["reuse_audio"]) is not bool:
+        raise ValueError("Choose whether to reuse audio or record every turn again.")
     total = 0
     for i, turn in enumerate(d["turns"]):
         if (

@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import gc
+import hashlib
 import io
 import logging
 import os
@@ -23,12 +24,14 @@ os.environ.setdefault("DO_NOT_TRACK", "1")
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import Response, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from .podcast_cache import PodcastAudioCache, audio_key
 
 app = FastAPI(title="Experis Speech Studio", docs_url=None, redoc_url=None)
 logger = logging.getLogger("studio")
 MAX_UPLOAD = 10 * 1024 * 1024
 lock = threading.Lock()
 state = {"model": None, "name": None, "phase": "Ready", "device": None}
+podcast_audio_cache = PodcastAudioCache()
 
 
 @app.middleware("http")
@@ -174,14 +177,16 @@ def preset_conditions(model, voice):
     cache = getattr(model, "_studio_presets", None)
     if cache is None:
         cache = model._studio_presets = {}
-    if voice not in cache:
+    path = ROOT / "server/presets" / f"{voice}.wav"
+    key = (voice, hashlib.sha256(path.read_bytes()).hexdigest())
+    if key not in cache:
         original = model.conds
         try:
-            model.prepare_conditionals(str(ROOT / "server/presets" / f"{voice}.wav"))
-            cache[voice] = model.conds
+            model.prepare_conditionals(str(path))
+            cache[key] = model.conds
         finally:
             model.conds = original
-    return cache[voice]
+    return cache[key]
 
 
 def encode_mp3(wav):
@@ -347,68 +352,88 @@ def podcast_pause(text):
     return 0.20 if text.rstrip().endswith("?") else 0.30
 
 
-def record_podcast(discussion, on_turn=None, cancelled=None, *, model_name="standard"):
+def record_podcast(discussion, on_turn=None, cancelled=None, *, model_name="standard", reuse_audio=None, stats=None):
     import numpy as np
     import soundfile as sf
-    import torch
-    import pyloudnorm as pyln
 
+    if reuse_audio is None:
+        reuse_audio = discussion.get("reuse_audio", True)
+    if type(reuse_audio) is not bool:
+        raise HTTPException(400, "Choose whether to reuse audio or record every turn again.")
     if not lock.acquire(blocking=False):
         raise HTTPException(409, "The studio is busy. Try again shortly.")
+    model = None
+    original = None
+    stats = stats if stats is not None else {}
+    stats.update(reused_turns=0, generated_turns=0, last_reused=False)
     try:
-        model = load_model(model_name)
-        original = model.conds
-        conditions = {}
+        voices = {"A": "female", "B": "male"}
+        fingerprints = {speaker: hashlib.sha256((ROOT / "server/presets" / f"{voice}.wav").read_bytes()).hexdigest()
+                        for speaker, voice in voices.items()}
         clips = []
-        try:
-            for speaker, voice in [("A", "female"), ("B", "male")]:
-                conditions[speaker] = preset_conditions(model, voice)
-            with torch.inference_mode():
-                for index, turn in enumerate(discussion["turns"]):
-                    state["phase"] = (
-                        f"Recording turn {index + 1} of {len(discussion['turns'])}"
-                    )
-                    model.conds = conditions[turn["speaker"]]
-                    pieces = []
+        sample_rate = None
+        for index, turn in enumerate(discussion["turns"]):
+            if cancelled is not None and cancelled.is_set():
+                return b""
+            kwargs = {"temperature": 0.8}
+            if model_name == "standard":
+                kwargs.update(exaggeration=0.65 if turn["speaker"] == "A" else 0.55, cfg_weight=0.3)
+            key = audio_key(turn["text"], turn["speaker"], model_name, fingerprints[turn["speaker"]], kwargs)
+            saved = podcast_audio_cache.get(key) if reuse_audio else None
+            stats["last_reused"] = saved is not None
+            if saved is not None:
+                state["phase"] = f"Reusing turn {index + 1} of {len(discussion['turns'])}"
+                samples, rate = saved.samples, saved.sample_rate
+                stats["reused_turns"] += 1
+            else:
+                import torch
+                import pyloudnorm as pyln
+                if model is None:
+                    model = load_model(model_name)
+                    original = model.conds
+                state["phase"] = f"Recording turn {index + 1} of {len(discussion['turns'])}"
+                model.conds = preset_conditions(model, voices[turn["speaker"]])
+                pieces = []
+                with torch.inference_mode():
                     for chunk in podcast_passages(turn["text"]):
                         if cancelled is not None and cancelled.is_set():
                             return b""
-                        kwargs = {"temperature": 0.8}
-                        if model_name == "standard":
-                            kwargs.update(
-                                exaggeration=0.65 if turn["speaker"] == "A" else 0.55,
-                                cfg_weight=0.3,
-                            )
                         wav = model.generate(chunk, **kwargs)
                         pieces.append(wav.detach().cpu().numpy().reshape(-1))
-                    samples = np.concatenate(pieces)
-                    # Preserve the model's natural timing and timbre. No time stretching.
-                    loudness = pyln.Meter(model.sr).integrated_loudness(samples)
-                    if np.isfinite(loudness):
-                        samples = pyln.normalize.loudness(samples, loudness, -20)
-                    peak = np.max(np.abs(samples))
-                    if peak > 0.92:
-                        samples = samples * (0.92 / peak)
-                    # Short fades prevent clicks; a modest pause gives each idea room.
-                    fade = min(180, len(samples) // 2)
-                    samples[:fade] *= np.linspace(0, 1, fade)
-                    samples[-fade:] *= np.linspace(1, 0, fade)
-                    clips.append(samples)
-                    clips.append(np.zeros(int(model.sr * podcast_pause(turn["text"])), dtype="float32"))
-                    if on_turn is not None:
-                        preview = io.BytesIO()
-                        sf.write(preview, np.concatenate(clips[-2:]), model.sr, format="WAV", subtype="PCM_16")
-                        on_turn(index, preview.getvalue())
-            stream = io.BytesIO()
-            sf.write(
-                stream, np.concatenate(clips), model.sr, format="WAV", subtype="PCM_16"
-            )
-            return stream.getvalue()
-        finally:
-            model.conds = original
+                if cancelled is not None and cancelled.is_set():
+                    return b""
+                samples = np.concatenate(pieces)
+                rate = model.sr
+                # Preserve the approved timing and timbre, including normalization and fades.
+                loudness = pyln.Meter(rate).integrated_loudness(samples)
+                if np.isfinite(loudness):
+                    samples = pyln.normalize.loudness(samples, loudness, -20)
+                peak = np.max(np.abs(samples))
+                if peak > 0.92:
+                    samples = samples * (0.92 / peak)
+                fade = min(180, len(samples) // 2)
+                samples[:fade] *= np.linspace(0, 1, fade)
+                samples[-fade:] *= np.linspace(1, 0, fade)
+                samples = np.concatenate([samples, np.zeros(int(rate * podcast_pause(turn["text"])), dtype="float32")])
+                # Save only completed turns. Fresh recordings replace the previous take.
+                podcast_audio_cache.put(key, samples, rate)
+                stats["generated_turns"] += 1
+            if sample_rate is not None and sample_rate != rate:
+                raise ValueError("The recording sample rate changed. Record every turn again.")
+            sample_rate = rate
+            clips.append(samples)
+            if on_turn is not None:
+                preview = io.BytesIO()
+                sf.write(preview, samples, rate, format="WAV", subtype="PCM_16")
+                on_turn(index, preview.getvalue())
+        stream = io.BytesIO()
+        sf.write(stream, np.concatenate(clips), sample_rate, format="WAV", subtype="PCM_16")
+        return stream.getvalue()
     finally:
-        lock.release()
+        if model is not None:
+            model.conds = original
         state["phase"] = "Ready"
+        lock.release()
 
 
 @app.post("/api/podcast/audio")
@@ -453,14 +478,16 @@ async def podcast_stream(request: Request):
             loop.call_soon_threadsafe(queue.put_nowait, event)
 
     def worker():
+        stats = {}
         try:
             wav = record_podcast(
                 discussion,
-                lambda index, clip: publish({"type": "turn", "index": index, "audio": base64.b64encode(clip).decode()}),
+                lambda index, clip: publish({"type": "turn", "index": index, "audio": base64.b64encode(clip).decode(), "reused": stats.get("last_reused", False)}),
                 cancelled,
+                stats=stats,
             )
             if not cancelled.is_set():
-                publish({"type": "complete", "audio": base64.b64encode(encode_mp3(wav)).decode(), "media_type": "audio/mpeg"})
+                publish({"type": "complete", "audio": base64.b64encode(encode_mp3(wav)).decode(), "media_type": "audio/mpeg", "reused_turns": stats.get("reused_turns", 0), "generated_turns": stats.get("generated_turns", 0)})
         except Exception as exc:
             logger.exception("Podcast stream failed")
             publish({"type": "error", "detail": exc.detail if isinstance(exc, HTTPException) else "Could not finish recording. Your script is still available."})

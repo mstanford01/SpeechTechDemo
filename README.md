@@ -90,7 +90,7 @@ Automated tests cover input validation, file import, preset-only enforcement, lo
 
 ## Local data handling
 
-No scripts, documents or audio are sent to an inference provider. Importing a URL contacts that website. Documents and generated audio are handled in memory or temporary files that are removed after processing. Users can explicitly download their outputs. Dependencies and weights require internet during initial setup. The speech engine serializes inference to limit memory use; the local writing process exits after each script.
+No scripts, documents or audio are sent to an inference provider. Importing a URL contacts that website. Documents and generated audio are handled in memory or temporary files that are removed after processing. Users can explicitly download their outputs. Dependencies and weights require internet during initial setup. Completed podcast turns can be retained in a bounded in-memory cache (128 MB, up to 128 turns), cleared when the server stops. No cached audio is written to disk. The speech engine serializes inference to limit memory use; the local writing process exits after each script.
 
 This is a loopback-only demonstration, not a publicly hosted service. Public deployment would require real authentication, authorization, abuse controls and an appropriately sized inference server. Chatterbox is the speech model; Qwen3-4B-Instruct-2507 (4-bit MLX) writes the discussion.
 
@@ -110,3 +110,13 @@ The server keeps preset voice conditioning in memory alongside the active speech
 Podcast recording streams completed turns to a **First listen** panel. You can play each turn before the entire episode is ready. The finished MP3 and transcript remain available after recording. Audio is held in memory only. Disconnecting stops generation between passages.
 
 For a short listening comparison of the revised Turbo delivery and the original Chatterbox model's expression controls, run `.venv-tts/bin/python scripts/compare_podcast_delivery.py` while the studio is idle. An optional path to a validated discussion JSON uses the same text for both versions. Samples are written to `.cache/voice-previews/`. Naturalness is a listening judgment, not an automated score. The live podcast uses Chatterbox Original with the selected B settings: expression 0.65 for Sophie, 0.55 for Joe, guidance 0.3 and temperature 0.8. Turbo remains available in the text and document modules.
+
+### Reusing podcast audio
+
+**Reuse unchanged turns** is the default in both podcast creation modes. An exact match of the spoken text, host, speech model, preset audio fingerprint and generation settings reuses the completed audio. Editing a turn records that turn again; changing only the episode title reuses its audio. The first recording still needs synthesis. Fully reused episodes can be assembled without loading the speech model.
+
+Select **Record every turn again** for a new performance. Fresh completed takes replace earlier matching takes for future reuse. Previews identify reused turns, and the finished episode reports reused and newly recorded turn counts. Failed or cancelled partial turns are never cached; completed turns from an interrupted recording can be reused on retry.
+
+This is a process-local, least-recently-used cache limited to 128 MB and 128 turns. Older takes can be evicted. Restarting the studio clears it. The approved Sophie and Joe voice settings, pauses, normalization, MP3 export and transcript download are preserved.
+
+A real two-turn check on the target Mac took 56.31 seconds for the first recording, including speech model startup, and 0.021 seconds for the fully reused repeat through the streaming API and MP3 encoder. Both turn WAVs matched byte for byte. This measures reuse of identical text, not faster synthesis of new content.

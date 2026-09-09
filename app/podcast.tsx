@@ -36,9 +36,11 @@ export default function Podcast({
   const [minutes, setMinutes] = useState('1');
   const [level, setLevel] = useState('everyday');
   const [workflow, setWorkflow] = useState('review');
+  const [audioReuse, setAudioReuse] = useState('reuse');
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [audio, setAudio] = useState('');
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<{ url: string; reused: boolean }[]>([]);
+  const [recordingStats, setRecordingStats] = useState<{ reused: number; generated: number } | null>(null);
   const previewUrls = useRef<string[]>([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -165,7 +167,7 @@ export default function Podcast({
   async function record(script: Discussion) {
     setBusy('record');
     setError('');
-    setStatus('Preparing the two preset voices');
+    setStatus(audioReuse === 'reuse' ? 'Checking saved audio' : 'Preparing the two preset voices');
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
     previewUrls.current = [];
     setPreviews([]);
@@ -173,7 +175,7 @@ export default function Podcast({
       const r = await fetch('/api/podcast/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(script),
+        body: JSON.stringify({ ...script, reuse_audio: audioReuse === 'reuse' }),
       });
       if (!r.ok) {
         const d = (await r.json()) as { detail?: string };
@@ -197,18 +199,20 @@ export default function Podcast({
           while ((newline = pending.indexOf('\n')) !== -1) {
             const event = JSON.parse(pending.slice(0, newline)) as {
               type: string; audio: string; detail?: string; media_type?: string;
+              reused?: boolean; reused_turns?: number; generated_turns?: number;
             };
             pending = pending.slice(newline + 1);
             if (event.type === 'error') throw Error(event.detail || 'Recording failed.');
             if (event.type === 'turn') {
               const url = URL.createObjectURL(audioBlob(event.audio));
               previewUrls.current.push(url);
-              setPreviews([...previewUrls.current]);
+              setPreviews((previous) => [...previous, { url, reused: !!event.reused }]);
             }
             if (event.type === 'complete') {
               if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
               audioUrl.current = URL.createObjectURL(audioBlob(event.audio, event.media_type));
               setAudio(audioUrl.current);
+              setRecordingStats({ reused: event.reused_turns || 0, generated: event.generated_turns || 0 });
               complete = true;
             }
           }
@@ -419,6 +423,19 @@ export default function Podcast({
                 ? 'Write and record in one step. Choose Review script first afterwards if you want to see or edit the conversation.'
                 : 'Read and edit the conversation before recording.'}
             </p>
+            <label id="podcast-audio-reuse">Audio recording</label>
+            <Select value={audioReuse} onValueChange={(v) => v && setAudioReuse(v)} disabled={!!busy}>
+              <SelectTrigger aria-labelledby="podcast-audio-reuse" className="model-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reuse">Reuse unchanged turns</SelectItem>
+                <SelectItem value="fresh">Record every turn again</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="helper">
+              {audioReuse === 'reuse'
+                ? 'Keep matching takes and record only what changed. Saved takes are available until the studio closes.'
+                : 'Create a fresh performance for every turn. These takes become the ones used next time.'}
+            </p>
             <div className="podcast-process">
               <span>
                 <FileText size={14} /> Read the source
@@ -471,9 +488,9 @@ export default function Podcast({
           <div className="result-label"><Headphones size={17} /> FIRST LISTEN</div>
           <h2>{busy === 'record' ? 'Your conversation is taking shape' : 'Listen by turn'}</h2>
           <p>{previews.length} turns ready. Play any completed turn.</p>
-          {previews.map((url, index) => (
+          {previews.map(({ url, reused }, index) => (
             <div key={url}>
-              <p>Turn {index + 1}</p>
+              <p>Turn {index + 1}{reused ? ' · Reused audio' : ' · Newly recorded'}</p>
               <audio controls src={url} aria-label={`Preview turn ${index + 1}`}
                 onPlay={(e) => document.querySelectorAll('audio').forEach((a) => {
                   if (a !== e.currentTarget) a.pause();
@@ -562,6 +579,7 @@ export default function Podcast({
             <Headphones size={17} /> YOUR PODCAST
           </div>
           <h2>{recordedTitle}</h2>
+          {recordingStats && <p>{recordingStats.reused} {recordingStats.reused === 1 ? 'turn reused' : 'turns reused'} · {recordingStats.generated} newly recorded</p>}
           <p>
             {duration
               ? `${Math.floor(duration / 60)}:${String(Math.round(duration % 60)).padStart(2, '0')} · `

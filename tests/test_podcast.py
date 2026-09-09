@@ -53,7 +53,7 @@ class PodcastTests(unittest.TestCase):
 
     def test_stream_emits_preview_then_completed_audio(self):
         import json
-        def record(discussion, on_turn, cancelled):
+        def record(discussion, on_turn, cancelled, **kwargs):
             on_turn(0, b"preview")
             return b"episode"
         discussion = {"title": "Topic", "turns": [
