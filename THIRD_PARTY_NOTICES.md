@@ -41,8 +41,8 @@ Attribution: Yamagishi, Junichi; Veaux, Christophe; MacDonald, Kirsten. (2019). 
 License: Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/
 
 Sources:
-- https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p225_023.wav
-- https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p226_023.wav
+- https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p299_023.wav
+- https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p311_023.wav
 - https://huggingface.co/kyutai/tts-voices/blob/main/README.md
 
 Podcast audio is newly generated speech conditioned on these presets, with volume normalization and conversational pauses, without tempo adjustment. The recordings do not imply endorsement by the corpus creators or speakers.

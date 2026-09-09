@@ -1780,3 +1780,40 @@ footer {
     font-size: 11px;
   }
 }
+/* YouTube transcription shares the studio's existing colors and panels. */
+.module-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.module-video { background: #213859; }
+.transcription-shell { min-height: 100vh; background: #f5f7fb; }
+.transcription-shell .home-header { max-width: none; background: #101e36; color: white; }
+.transcription-home { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.transcription-main { max-width: 1040px; padding: 40px 28px 70px; margin: auto; }
+.transcription-intro { display: flex; gap: 20px; align-items: center; margin-bottom: 30px; }
+.transcription-intro h1 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -1px; margin: 0 0 8px; }
+.transcription-intro p { color: #576880; line-height: 1.6; margin: 0; }
+.transcription-icon { border-radius: 18px; background: #e6eef9; color: #30588f; padding: 20px; }
+.transcription-progress { display: flex; align-items: center; gap: 14px; padding: 24px 0; color: #30588f; }
+.transcription-progress small { display: block; color: #576880; margin-top: 6px; }
+.transcription-result { margin-top: 24px; }
+.transcription-result .panel-heading { align-items: start; }
+.transcription-result .panel-heading h2 { font-size: 21px; line-height: 1.4; overflow-wrap: anywhere; }
+.transcription-result textarea { width: 100%; min-height: 340px; resize: vertical; font: inherit; line-height: 1.7; border: 1px solid #d8e2ef; border-radius: 8px; padding: 16px; color: #26364e; }
+.transcription-actions { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-top: 20px; }
+@media (max-width: 1100px) { .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) {
+  .module-grid { grid-template-columns: 1fr; }
+  .transcription-main { padding: 28px 18px; }
+  .transcription-icon { display: none; }
+  .transcription-home { font-size: 12px; }
+  .transcription-shell .home-header { padding: 0 18px; }
+  .transcription-shell .url-input { flex-wrap: wrap; }
+  .transcription-shell .url-input input { flex-basis: 100%; padding: 10px 0; }
+}
+.transcription-source-body { margin-top: 22px; }
+.transcription-source-body > label, .transcription-summary-controls label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.transcription-upload { display: flex; align-items: center; gap: 18px; text-align: left; padding: 24px; width: 100%; border: 1px dashed #8da6c8; border-radius: 10px; color: #30588f; background: #f5f8fd; overflow-wrap: anywhere; }
+.transcription-upload span { min-width: 0; }
+.transcription-upload small { display: block; color: #576880; margin-top: 8px; line-height: 1.5; }
+.transcription-summary-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.transcription-summary-output { border-top: 1px solid #dde3ed; margin-top: 26px; padding-top: 16px; }
+.transcription-summary-output > p { line-height: 1.75; }
+@media (max-width: 650px) { .transcription-summary-controls { grid-template-columns: 1fr; } }

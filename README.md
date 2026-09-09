@@ -1,10 +1,12 @@
 # Experis Voice Studio
 
-A local customer demo with three modules:
+A local customer demo with four modules:
 
 - **Text to speech:** type a script, choose a preset voice, generate and download audio.
 - **Document to audio:** import DOCX, PDF, TXT or Markdown, review the extracted text, then generate speech.
 - **Article to podcast:** paste text, upload an article, or import a public URL. A local language model writes a two-person discussion. Review or edit the script, then record it with fixed female and male voices.
+
+- **Transcribe & summarize:** transcribe a YouTube video or uploaded audio, or summarize an article directly from its URL. Choose an explanation level and paragraph count.
 
 ## Open on the prepared Mac
 
@@ -33,9 +35,17 @@ Import a written document up to 10 MB. Review the text before generating. Speech
 
 Podcasts feature Sophie (California) and Joe (Iowa), a fixed American English voice pair. Scripts include a brief greeting, connected discussion and a friendly close. Both hosts use natural speaking pace without audio time stretching. Normal turns stay together to preserve sentence context, and questions have quicker handoffs than explanations. The server balances volume and retains the fixed American voice pair. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
 
+### Transcribe & summarize
+
+Use a public YouTube video or upload MP3, WAV, M4A, AAC, FLAC, OGG, WebM or MP4. The app downloads and transcribes the audio with local Whisper large-v3-turbo. It never requests or reads YouTube captions. Limits are two hours and 250 MB. Restricted or sign-in-only videos are unsupported, and YouTube may block some downloads.
+
+The full transcript is editable and downloadable. In the summary section, choose **Article URL** to import an article directly, or use the transcript above. Choose **Standard** (default), **Plain language**, or **Technical depth**, and **1, 3, 5 or 8 paragraphs**. Article imports support 150 to 24,000 characters; transcript summaries support up to 200,000 characters. Long transcripts are summarized in sections before a final summary is written. Summaries use a source-grounded prompt with direct wording and no em dashes. Review the result before sharing; the model can still make mistakes.
+
+Download the summary as text or send it to the podcast module. This handoff uses temporary browser session storage and is cleared when the podcast module reads it. A real 84-second Experis YouTube video and a 54-second uploaded WAV were tested; the two-hour limit has not been benchmarked end to end.
+
 ## Preset voices only
 
-V1 does not accept uploaded voices. The speech API rejects file uploads and unknown voice IDs. The male and female presets come from the openly licensed VCTK corpus and are installed with attribution. Chatterbox uses them as fixed conditioning presets. No model training or fine-tuning occurs. See [credits and licenses](THIRD_PARTY_NOTICES.md).
+V1 does not accept uploaded voice presets. Audio uploads in the transcription module only produce text. The speech API rejects file uploads and unknown voice IDs. The male and female presets come from the openly licensed VCTK corpus and are installed with attribution. Chatterbox uses them as fixed conditioning presets. No model training or fine-tuning occurs. See [credits and licenses](THIRD_PARTY_NOTICES.md).
 
 ## Setup on another Apple Silicon Mac
 
@@ -46,6 +56,8 @@ uv venv --python 3.11 .venv-tts
 uv pip install --python .venv-tts/bin/python -r server/requirements-lock.txt
 uv venv --python 3.11 .venv-llm
 uv pip install --python .venv-llm/bin/python -r server/requirements-llm-lock.txt
+uv venv --python 3.11 .venv-transcribe
+uv pip install --python .venv-transcribe/bin/python -r server/requirements-transcribe-lock.txt
 pnpm install
 pnpm build
 .venv-tts/bin/python scripts/download_presets.py
@@ -54,7 +66,7 @@ pnpm build
 .venv-tts/bin/python scripts/launch.py
 ```
 
-Models are cached in `.cache/huggingface` and excluded from Git. Python 3.12 is incompatible with the NumPy version pinned by Chatterbox 0.1.6. The language model runs in a separate environment because its NumPy requirements differ. The project pins setuptools for compatibility with Perth audio watermarking, which remains enabled.
+Models are cached in `.cache/huggingface` and excluded from Git. Python 3.12 is incompatible with the NumPy version pinned by Chatterbox 0.1.6. The language and transcription models run in separate environments because their NumPy requirements differ. Whisper weights download on the first transcription and remain in the local cache. The project pins setuptools for compatibility with Perth audio watermarking, which remains enabled.
 
 The target Mac is an Apple M1 Max with 32 GB unified memory. Speech uses MPS when available; the discussion writer uses MLX. To troubleshoot speech on CPU, set `CHATTERBOX_DEVICE=cpu` before launching.
 

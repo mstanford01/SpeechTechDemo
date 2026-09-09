@@ -74,6 +74,17 @@ export default function Podcast({
     },
     [],
   );
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('experis-podcast-source');
+      if (!saved) return;
+      const data = JSON.parse(saved) as { text?: string; title?: string };
+      if (typeof data.text === 'string' && data.text.length <= 24000) {
+        setArticle(data.text); setSource(data.title || 'Video transcript');
+      }
+      sessionStorage.removeItem('experis-podcast-source');
+    } catch { /* Manual import remains available when browser storage is unavailable. */ }
+  }, []);
   async function jsonRequest(
     path: string,
     body: BodyInit,

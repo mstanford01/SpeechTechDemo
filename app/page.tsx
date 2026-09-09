@@ -6,6 +6,7 @@ import {
   Headphones,
   Keyboard,
   ShieldCheck,
+  Video,
 } from 'lucide-react';
 export default function Home() {
   return (
@@ -25,13 +26,13 @@ export default function Home() {
             <span /> THE VOICE STUDIO
           </div>
           <h1>
-            From page
+            Listen. Read.
             <br />
-            to <span>playback.</span>
+            <span>Create.</span>
           </h1>
           <div className="home-description">
             <p>
-              A script, a document, or an article.
+              Text, documents, videos and audio recordings.
               <br />
               Choose where to begin.
             </p>
@@ -107,6 +108,13 @@ export default function Home() {
             <span className="module-cta">
               Make a podcast <ArrowRight size={17} />
             </span>
+          </a>
+          <a href="/transcribe/" className="module-card module-video">
+            <div className="module-top"><span className="module-number">04 / TRANSCRIBE</span><ArrowUpRight size={24} /></div>
+            <div className="module-art"><Video size={62} strokeWidth={1.1} /></div>
+            <h2>Transcribe & summarize</h2>
+            <p>Audio, YouTube videos and articles.<br />Get the words. Get the key ideas.</p>
+            <span className="module-cta">Get the transcript <ArrowRight size={17} /></span>
           </a>
         </section>
         <div className="home-footnote">

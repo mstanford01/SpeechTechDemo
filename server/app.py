@@ -481,13 +481,95 @@ async def podcast_stream(request: Request):
     return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
+@app.post("/api/youtube")
+async def youtube_transcript(request: Request):
+    from .youtube import video_id, transcribe_video
+    try:
+        payload = await request.json()
+        url = payload.get("url") if isinstance(payload, dict) else None
+        video_id(url)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not lock.acquire(blocking=False):
+        raise HTTPException(409, "The studio is busy. Try again when the current recording finishes.")
+    state["phase"] = "Downloading and transcribing video audio"
+    try:
+        return await asyncio.to_thread(transcribe_video, url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Video transcription failed")
+        raise HTTPException(503, "Could not finish the transcript. Please try again.") from exc
+    finally:
+        state["phase"] = "Ready"
+        lock.release()
+
+
+@app.post("/api/transcribe/upload")
+async def transcribe_upload(file: UploadFile = File(...)):
+    from .youtube import run_local_script
+    filename = file.filename or "audio"
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".webm", ".mp4"}:
+        await file.close()
+        raise HTTPException(400, "Choose an MP3, WAV, M4A, AAC, FLAC, OGG, WebM or MP4 file.")
+    if not lock.acquire(blocking=False):
+        await file.close()
+        raise HTTPException(409, "The studio is busy. Try again shortly.")
+    state["phase"] = "Transcribing uploaded audio"
+    try:
+        with tempfile.TemporaryDirectory(prefix="experis-upload-audio-") as folder:
+            path = Path(folder) / ("source" + suffix)
+            size = 0
+            with path.open("wb") as stream:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > 250 * 1024 * 1024:
+                        raise HTTPException(413, "Choose an audio file smaller than 250 MB.")
+                    stream.write(chunk)
+            if not size:
+                raise HTTPException(400, "The audio file is empty.")
+            data = await asyncio.to_thread(run_local_script, "transcribe_upload.py", [str(path)])
+            return {**data, "title": filename, "url": ""}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    finally:
+        await file.close()
+        state["phase"] = "Ready"
+        lock.release()
+
+
+@app.post("/api/transcribe/summary")
+async def transcript_summary(request: Request):
+    from .youtube import summarize_transcript
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(400, "Provide source text and summary settings.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Provide source text and summary settings.")
+    if not lock.acquire(blocking=False):
+        raise HTTPException(409, "The studio is busy. Try again shortly.")
+    state["phase"] = "Writing the summary"
+    try:
+        return await asyncio.to_thread(summarize_transcript, payload.get("text"), payload.get("level", "everyday"), payload.get("paragraphs", 5))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Summary generation failed")
+        raise HTTPException(503, "Could not create the summary. Please try again.") from exc
+    finally:
+        state["phase"] = "Ready"
+        lock.release()
+
+
 static_dir = ROOT / "dist" / "client"
 if static_dir.exists():
 
     @app.get("/{module}")
     @app.get("/{module}/")
     def module_page(module: str):
-        if module not in {"speak", "documents", "podcast"}:
+        if module not in {"speak", "documents", "podcast", "transcribe"}:
             path = static_dir / module
             if path.is_file() and path.parent == static_dir:
                 return FileResponse(path)
