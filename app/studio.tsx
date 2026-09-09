@@ -16,6 +16,7 @@ import {
   Mic,
 } from 'lucide-react';
 import Podcast from './podcast';
+import StudioBreadcrumbs from '@/components/studio-breadcrumbs';
 import { Slider } from '@/components/ui/slider';
 import {
   Select,
@@ -273,11 +274,12 @@ export default function Studio({
             <i /> Local demo · no sign-in
           </span>
           <a className="module-home-link" href="/">
-            All tools <ArrowUpRight size={14} />
+            Back to home
           </a>
         </div>
       </header>
       <main>
+        <StudioBreadcrumbs current={mode === 'podcast' ? 'Article to podcast' : documentMode ? 'Document to audio' : 'Text to speech'} />
         <div className="page-heading">
           <div>
             <div className="eyebrow">

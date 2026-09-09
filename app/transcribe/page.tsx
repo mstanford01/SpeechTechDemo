@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Download, Headphones, LoaderCircle, Video, Upload, FileText } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import StudioBreadcrumbs from '@/components/studio-breadcrumbs';
 
 type Transcript = { title: string; url: string; text: string; language: string; duration: number; captions_used: boolean };
 type Summary = { text: string; paragraphs: number; level: string };
@@ -79,9 +80,10 @@ export default function Transcribe() {
     <header className="home-header">
       <a href="/" aria-label="Experis Voice Studio home"><img src="/experis-logo.svg" width="123" height="40" alt="Experis" /></a>
       <span className="home-header-label">VOICE STUDIO</span>
-      <a href="/" className="transcription-home"><ArrowLeft size={16} /> All modules</a>
+      <a href="/" className="transcription-home"><ArrowLeft size={16} /> Back to home</a>
     </header>
     <main className="transcription-main">
+      <StudioBreadcrumbs current="Transcribe & summarize" />
       <div className="transcription-intro"><span className="transcription-icon"><Headphones size={30} /></span><div><h1>Transcribe & summarize</h1><p>Get the words from a recording. Get the key ideas from a recording or article.</p></div></div>
       <section className="panel"><div className="article-body">
         <label id="transcription-source">Start with</label>
