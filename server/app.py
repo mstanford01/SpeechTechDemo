@@ -351,10 +351,14 @@ def record_podcast(discussion, on_turn=None, cancelled=None):
                     for chunk in split_text(turn["text"]):
                         if cancelled is not None and cancelled.is_set():
                             return b""
-                        wav = model.generate(chunk, temperature=0.65)
+                        wav = model.generate(
+                            chunk, temperature=0.8 if turn["speaker"] == "A" else 0.65
+                        )
                         pieces.append(wav.detach().cpu().numpy().reshape(-1))
                     samples = np.concatenate(pieces)
-                    samples = librosa.effects.time_stretch(samples, rate=0.96)
+                    # Keep Sophie's natural pace; Joe retains his relaxed delivery.
+                    if turn["speaker"] == "B":
+                        samples = librosa.effects.time_stretch(samples, rate=0.96)
                     loudness = pyln.Meter(model.sr).integrated_loudness(samples)
                     if np.isfinite(loudness):
                         samples = pyln.normalize.loudness(samples, loudness, -20)

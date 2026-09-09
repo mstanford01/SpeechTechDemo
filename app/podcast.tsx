@@ -212,7 +212,7 @@ export default function Podcast({
           discussion.turns
             .map(
               (t) =>
-                (t.speaker === 'A' ? 'Female host' : 'Male co-host') +
+                (t.speaker === 'A' ? 'Sophie' : 'Joe') +
                 ': ' +
                 t.text,
             )
@@ -333,15 +333,15 @@ export default function Podcast({
             <div className="host-profile">
               <span className="host-avatar female">A</span>
               <div>
-                <strong>Female host</strong>
-                <small>Curious questions · clear perspective</small>
+                <strong>Sophie</strong>
+                <small>Warm, curious · American English</small>
               </div>
             </div>
             <div className="host-profile">
               <span className="host-avatar male">B</span>
               <div>
-                <strong>Male co-host</strong>
-                <small>Thoughtful answers · calm delivery</small>
+                <strong>Joe</strong>
+                <small>Calm, thoughtful · American English</small>
               </div>
             </div>
             <p className="host-note">
@@ -494,7 +494,7 @@ export default function Podcast({
                   </span>
                   <div>
                     <label htmlFor={`turn-${i}`}>
-                      {turn.speaker === 'A' ? 'Female host' : 'Male co-host'}
+                      {turn.speaker === 'A' ? 'Sophie' : 'Joe'}
                     </label>
                     <textarea
                       id={`turn-${i}`}

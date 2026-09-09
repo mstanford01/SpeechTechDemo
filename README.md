@@ -31,7 +31,7 @@ Import a written document up to 10 MB. Review the text before generating. Speech
 5. Review the facts and edit the speaker turns if needed.
 6. Record the podcast, then play and download the WAV and transcript.
 
-Podcasts use a fixed female host and male co-host. The server levels volume, slightly relaxes the speaking rate, and adds short pauses between turns. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
+Podcasts feature Sophie and Joe, a fixed American English voice pair. Scripts include a brief greeting, connected discussion and a friendly close. Sophie uses more varied delivery at her natural pace; Joe retains his relaxed speaking rate. The server levels volume and adds short pauses between turns. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
 
 ## Preset voices only
 
