@@ -85,7 +85,7 @@ This is a loopback-only demonstration, not a publicly hosted service. Public dep
 
 - Resemble AI Chatterbox, MIT: https://github.com/resemble-ai/chatterbox
 - Qwen3-4B-Instruct-2507, Apache 2.0, converted by mlx-community.
-- VCTK p225/p226 recordings, CC BY 4.0, used as fixed presets.
+- VCTK p329/p311 recordings, CC BY 4.0, used as fixed presets.
 - Experis branding: https://www.experis.com/en
 
 Full attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and available from the app's credits link.

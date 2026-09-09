@@ -4,8 +4,8 @@ from urllib.request import urlopen
 import hashlib
 ROOT = Path(__file__).resolve().parents[1]
 PRESETS = {
-    'female': ('p225_023.wav', '4f15f804be0f437912697ffaa56b03759e10b5e1db82fcdac20412fe95bedec9'),
-    'male': ('p226_023.wav', '80b7c8d8eb9129af901750897727647291e13418dab919e3922ba58b482cf9a9'),
+    'female': ('p329_023.wav', '3c313baf9d5abfa08101e4a3148589d0b5bcc95f0716f217d1218a5b12e5624d'),
+    'male': ('p311_023.wav', 'ad2bbe69f979535c2e09aaddcd1b83a21f90a50ac7502f596162fe0831f052bb'),
 }
 for name, (filename, expected) in PRESETS.items():
     destination = ROOT / 'server' / 'presets' / f'{name}.wav'
