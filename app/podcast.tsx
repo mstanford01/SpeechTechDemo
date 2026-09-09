@@ -35,6 +35,7 @@ export default function Podcast({
   const [source, setSource] = useState('');
   const [minutes, setMinutes] = useState('1');
   const [level, setLevel] = useState('everyday');
+  const [workflow, setWorkflow] = useState('review');
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [audio, setAudio] = useState('');
   const [previews, setPreviews] = useState<string[]>([]);
@@ -154,14 +155,14 @@ export default function Podcast({
         { 'Content-Type': 'application/json' },
       );
       setDiscussion(d);
+      if (workflow === 'direct') await record(d);
     } catch (e) {
       setError(String((e as Error).message));
     } finally {
       setBusy('');
     }
   }
-  async function record() {
-    if (!discussion) return;
+  async function record(script: Discussion) {
     setBusy('record');
     setError('');
     setStatus('Preparing the two preset voices');
@@ -172,7 +173,7 @@ export default function Podcast({
       const r = await fetch('/api/podcast/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(discussion),
+        body: JSON.stringify(script),
       });
       if (!r.ok) {
         const d = (await r.json()) as { detail?: string };
@@ -216,11 +217,11 @@ export default function Podcast({
       } finally {
         await reader.cancel();
       }
-      setRecordedTitle(discussion.title);
+      setRecordedTitle(script.title);
       setRecordedScript(
-        discussion.title +
+        script.title +
           '\n\n' +
-          discussion.turns
+          script.turns
             .map(
               (t) =>
                 (t.speaker === 'A' ? 'Sophie' : 'Joe') +
@@ -255,7 +256,7 @@ export default function Podcast({
       <div className="podcast-intro">
         <div>
           <h2>A conversation worth listening to.</h2>
-          <p>Bring an article. Review the script. Record the discussion.</p>
+          <p>Bring an article. Choose how you want to make your podcast.</p>
         </div>
         <span className="podcast-local">
           <Check size={14} /> Written & voiced locally
@@ -402,7 +403,20 @@ export default function Podcast({
               </SelectContent>
             </Select>
             <p className="helper">
-              Length is a guide. Review the discussion before recording it.
+              Length is a guide.
+            </p>
+            <label id="podcast-workflow">Creation mode</label>
+            <Select value={workflow} onValueChange={(v) => v && setWorkflow(v)} disabled={!!busy}>
+              <SelectTrigger aria-labelledby="podcast-workflow" className="model-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="review">Review script first</SelectItem>
+                <SelectItem value="direct">Generate audio directly</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="helper">
+              {workflow === 'direct'
+                ? 'Write and record in one step. Choose Review script first afterwards if you want to see or edit the conversation.'
+                : 'Read and edit the conversation before recording.'}
             </p>
             <div className="podcast-process">
               <span>
@@ -437,12 +451,12 @@ export default function Podcast({
           disabled={!!busy || article.trim().length < 150}
           onClick={write}
         >
-          {busy === 'write' ? (
+          {busy === 'write' || busy === 'record' ? (
             <LoaderCircle className="spin" size={18} />
           ) : (
             <Sparkles size={18} />
           )}{' '}
-          {discussion ? 'Rewrite discussion' : 'Create discussion'}
+          {busy === 'write' ? 'Writing discussion…' : busy === 'record' ? 'Recording podcast…' : workflow === 'direct' ? 'Generate podcast' : discussion ? 'Rewrite discussion' : 'Create discussion'}
           <ArrowRight size={16} />
         </button>
       </div>
@@ -467,7 +481,7 @@ export default function Podcast({
           ))}
         </section>
       )}
-      {discussion && (
+      {discussion && (workflow === 'review' || !!error) && (
         <section className="panel discussion-panel">
           <div className="panel-heading">
             <div>
@@ -528,7 +542,7 @@ export default function Podcast({
             <button
               className="generate-button record-button"
               disabled={!!busy || discussion.turns.some((t) => !t.text.trim())}
-              onClick={record}
+              onClick={() => void record(discussion)}
             >
               {busy === 'record' ? (
                 <LoaderCircle className="spin" size={18} />
