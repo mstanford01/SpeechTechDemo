@@ -29,7 +29,7 @@ Import a written document up to 10 MB. Review the text before generating. Speech
 3. Choose an approximate one- or two-minute length.
 4. Create the discussion. The source is paraphrased and explained, not read verbatim.
 5. Review the facts and edit the speaker turns if needed.
-6. Record the podcast, then play and download the WAV and transcript.
+6. Record the podcast, then play and download the MP3 and transcript.
 
 Podcasts feature Sophie and Joe, a fixed American English voice pair. Scripts include a brief greeting, connected discussion and a friendly close. Both hosts use natural speaking pace without audio time stretching. Normal turns stay together to preserve sentence context, and questions have quicker handoffs than explanations. The server balances volume and retains the fixed American voice pair. Generation can take several minutes on this Mac. Targets for duration are approximate. Listen before a presentation because model outputs can contain pronunciation mistakes or unsupported claims despite the source-grounded prompt.
 
@@ -94,6 +94,6 @@ Full attribution is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and avai
 
 The server keeps preset voice conditioning in memory alongside the active speech model. Repeated speech requests and podcasts reuse it; switching models or restarting clears it. A local M1 Max measurement took 13.0 seconds to prepare both podcast presets initially and under 1 ms to retrieve them again. This removes preparation overhead, not the time spent synthesizing speech.
 
-Podcast recording streams completed turns to a **First listen** panel. You can play each turn before the entire episode is ready. The finished WAV and transcript remain available after recording. Audio is held in memory only. Disconnecting stops generation between passages.
+Podcast recording streams completed turns to a **First listen** panel. You can play each turn before the entire episode is ready. The finished MP3 and transcript remain available after recording. Audio is held in memory only. Disconnecting stops generation between passages.
 
 For a short listening comparison of the revised Turbo delivery and the original Chatterbox model's expression controls, run `.venv-tts/bin/python scripts/compare_podcast_delivery.py` while the studio is idle. An optional path to a validated discussion JSON uses the same text for both versions. Samples are written to `.cache/voice-previews/`. Naturalness is a listening judgment, not an automated score. The live podcast uses Chatterbox Original with the selected B settings: expression 0.65 for Sophie, 0.55 for Joe, guidance 0.3 and temperature 0.8. Turbo remains available in the text and document modules.

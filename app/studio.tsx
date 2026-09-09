@@ -197,6 +197,7 @@ export default function Studio({
       form.append('voice', voice);
       form.append('exaggeration', String(expression));
       form.append('cfg_weight', String(pace));
+      form.append('format', 'mp3');
       const r = await fetch('/api/generate', { method: 'POST', body: form });
       if (!r.ok) {
         const d = (await r.json()) as {
@@ -553,7 +554,7 @@ export default function Studio({
               <div className="output-title">
                 <span className="step">03</span>
                 <h2>Hear the difference</h2>
-                <span className="output-format">WAV · 24 kHz</span>
+                <span className="output-format">MP3 · 24 kHz</span>
               </div>
               {audio ? (
                 <div className="audio-result">
@@ -568,9 +569,9 @@ export default function Studio({
                     <a
                       className="download"
                       href={audio}
-                      download="experis-speech.wav"
+                      download="experis-speech.mp3"
                     >
-                      <Download size={16} /> Download WAV
+                      <Download size={16} /> Download MP3
                     </a>
                   </div>
                   <div

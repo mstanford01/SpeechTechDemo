@@ -184,6 +184,16 @@ def preset_conditions(model, voice):
     return cache[voice]
 
 
+def encode_mp3(wav):
+    """Encode the finished recording in memory with the bundled libsndfile codec."""
+    import soundfile as sf
+
+    samples, rate = sf.read(io.BytesIO(wav), dtype="float32")
+    output = io.BytesIO()
+    sf.write(output, samples, rate, format="MP3", compression_level=0.0, bitrate_mode="VARIABLE")
+    return output.getvalue()
+
+
 def synthesize(text, name, exaggeration, cfg_weight, voice="default"):
     import numpy as np
     import soundfile as sf
@@ -241,6 +251,7 @@ async def generate(
     exaggeration: float = Form(0.5),
     cfg_weight: float = Form(0.5),
     voice: str = Form("default"),
+    format: str = Form("wav"),
     request: Request = None,
 ):
     text = text.strip()
@@ -250,6 +261,8 @@ async def generate(
         raise HTTPException(400, "Choose a supported Chatterbox model.")
     if not 0.25 <= exaggeration <= 1.5 or not 0 <= cfg_weight <= 1:
         raise HTTPException(400, "Speech settings are outside the allowed range.")
+    if format not in {"wav", "mp3"}:
+        raise HTTPException(400, "Choose WAV or MP3 audio.")
     if voice not in {"default", "male", "female"}:
         raise HTTPException(400, "Choose a supplied preset voice.")
     if any(hasattr(value, "filename") for value in (await request.form()).values()):
@@ -267,9 +280,9 @@ async def generate(
             "The speech engine could not complete this request. Check the studio terminal for details, then try a shorter script.",
         ) from exc
     return Response(
-        wav,
-        media_type="audio/wav",
-        headers={"Content-Disposition": 'attachment; filename="experis-speech.wav"'},
+        await asyncio.to_thread(encode_mp3, wav) if format == "mp3" else wav,
+        media_type="audio/mpeg" if format == "mp3" else "audio/wav",
+        headers={"Content-Disposition": f'attachment; filename="experis-speech.{format}"'},
     )
 
 
@@ -446,7 +459,8 @@ async def podcast_stream(request: Request):
                 lambda index, clip: publish({"type": "turn", "index": index, "audio": base64.b64encode(clip).decode()}),
                 cancelled,
             )
-            publish({"type": "complete", "audio": base64.b64encode(wav).decode()})
+            if not cancelled.is_set():
+                publish({"type": "complete", "audio": base64.b64encode(encode_mp3(wav)).decode(), "media_type": "audio/mpeg"})
         except Exception as exc:
             logger.exception("Podcast stream failed")
             publish({"type": "error", "detail": exc.detail if isinstance(exc, HTTPException) else "Could not finish recording. Your script is still available."})

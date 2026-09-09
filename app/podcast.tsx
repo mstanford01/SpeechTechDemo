@@ -172,9 +172,9 @@ export default function Podcast({
       const decoder = new TextDecoder();
       let pending = '';
       let complete = false;
-      const audioBlob = (encoded: string) => new Blob(
+      const audioBlob = (encoded: string, mediaType = 'audio/wav') => new Blob(
         [Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0))],
-        { type: 'audio/wav' },
+        { type: mediaType },
       );
       try {
         while (true) {
@@ -184,7 +184,7 @@ export default function Podcast({
           let newline;
           while ((newline = pending.indexOf('\n')) !== -1) {
             const event = JSON.parse(pending.slice(0, newline)) as {
-              type: string; audio: string; detail?: string;
+              type: string; audio: string; detail?: string; media_type?: string;
             };
             pending = pending.slice(newline + 1);
             if (event.type === 'error') throw Error(event.detail || 'Recording failed.');
@@ -195,7 +195,7 @@ export default function Podcast({
             }
             if (event.type === 'complete') {
               if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-              audioUrl.current = URL.createObjectURL(audioBlob(event.audio));
+              audioUrl.current = URL.createObjectURL(audioBlob(event.audio, event.media_type));
               setAudio(audioUrl.current);
               complete = true;
             }
@@ -553,8 +553,8 @@ export default function Podcast({
             }
           />
           <div className="podcast-downloads">
-            <a className="download" href={audio} download="experis-podcast.wav">
-              <Download size={15} /> Download podcast
+            <a className="download" href={audio} download="experis-podcast.mp3">
+              <Download size={15} /> Download MP3
             </a>
             <button className="download" onClick={downloadTranscript}>
               <FileText size={15} /> Download transcript

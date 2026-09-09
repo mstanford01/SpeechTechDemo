@@ -32,11 +32,13 @@ class PodcastTests(unittest.TestCase):
             {"speaker": "A", "text": "Question."},
             {"speaker": "B", "text": "Answer."},
         ]}
-        with patch("server.app.record_podcast", side_effect=record):
+        with patch("server.app.record_podcast", side_effect=record), patch("server.app.encode_mp3", return_value=b"mp3episode") as encode:
             response = TestClient(app).post("/api/podcast/stream", json=discussion)
         events = [json.loads(line) for line in response.text.splitlines()]
         self.assertEqual([event["type"] for event in events], ["turn", "complete"])
         self.assertEqual(events[0]["audio"], "cHJldmlldw==")
+        self.assertEqual(events[1]["media_type"], "audio/mpeg")
+        encode.assert_called_once_with(b"episode")
 
     def test_stream_reports_failure_without_fake_completion(self):
         import json
