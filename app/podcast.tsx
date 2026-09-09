@@ -400,6 +400,7 @@ export default function Podcast({
               <SelectContent>
                 <SelectItem value="1">Quick listen · about 1 minute</SelectItem>
                 <SelectItem value="2">Go deeper · about 2 minutes</SelectItem>
+                <SelectItem value="3">Extended conversation · about 3 minutes</SelectItem>
               </SelectContent>
             </Select>
             <p className="helper">

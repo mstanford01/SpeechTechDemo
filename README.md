@@ -28,7 +28,7 @@ Import a written document up to 10 MB. Review the text before generating. Speech
 
 1. Import a document or public article URL, or paste an article of 150 to 24,000 characters.
 2. Choose **Standard** (default), **Plain language**, or **Technical depth**.
-3. Choose an approximate one- or two-minute length.
+3. Choose an approximate one-, two- or three-minute length. One minute is the default. The three-minute option requests sixteen substantive turns plus the greeting and close, targeting roughly 420 words overall.
    Choose **Generate audio directly** under **Creation mode** to write and record in one step. The default **Review script first** mode follows the review steps below. You can switch back to review mode afterwards to view or edit the generated script.
 4. Create the discussion. The source is paraphrased and explained, not read verbatim.
 5. Review the facts and edit the speaker turns if needed.

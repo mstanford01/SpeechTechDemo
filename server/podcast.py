@@ -128,8 +128,8 @@ def write_discussion(article, minutes, level="everyday"):
         raise ValueError("Provide an article between 150 and 24,000 characters.")
     if level not in {"plain", "everyday", "technical"}:
         raise ValueError("Choose a supported explanation level.")
-    if minutes not in {1, 2}:
-        raise ValueError("Choose a one- or two-minute discussion.")
+    if type(minutes) is not int or minutes not in {1, 2, 3}:
+        raise ValueError("Choose a one-, two- or three-minute discussion.")
     python = ROOT / ".venv-llm/bin/python"
     if not python.exists():
         raise ValueError(

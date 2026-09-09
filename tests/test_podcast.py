@@ -6,6 +6,34 @@ from server.podcast import validate_discussion, validate_url
 
 
 class PodcastTests(unittest.TestCase):
+    def test_unsupported_numeric_claims_are_removed_in_full(self):
+        from scripts.podcast_text import remove_unsupported_numeric_sentences
+        source = "73% of employers report hiring difficulty. Use short lessons."
+        self.assertEqual(remove_unsupported_numeric_sentences(
+            "73% report difficulty. Training improves output by 20%. Short lessons can help.", source
+        ), "73% report difficulty. Short lessons can help.")
+        self.assertEqual(remove_unsupported_numeric_sentences("Use 30-minute lessons.", source), "")
+
+    def test_three_minute_script_request_and_one_minute_default(self):
+        discussion = {"title": "Topic", "turns": [
+            {"speaker": "A" if i % 2 == 0 else "B", "text": "A source-supported point."}
+            for i in range(20)
+        ]}
+        self.assertEqual(validate_discussion(discussion), discussion)
+        with patch("server.podcast.write_discussion", return_value=discussion) as writer:
+            client = TestClient(app)
+            self.assertEqual(client.post("/api/podcast/script", json={"article": "Source " * 40, "minutes": 3}).status_code, 200)
+            self.assertEqual(writer.call_args.args[1], 3)
+            self.assertEqual(client.post("/api/podcast/script", json={"article": "Source " * 40}).status_code, 200)
+            self.assertEqual(writer.call_args.args[1], 1)
+
+    def test_discussion_rejects_unsupported_durations_before_inference(self):
+        from server.podcast import write_discussion
+        for duration in [0, 4, True, "3", 1.5]:
+            with self.assertRaises(ValueError), patch("server.podcast.subprocess.run") as worker:
+                write_discussion("Source " * 40, duration)
+            worker.assert_not_called()
+
     def test_preset_cache_is_per_model_and_restores_default(self):
         from server.app import preset_conditions
         class Model:
